@@ -5,6 +5,9 @@ from datetime import date, timedelta
 import calendar
 import requests
 from collections import OrderedDict
+import socket
+from requests import ConnectionError
+from time import sleep
 from six import print_
 import json
 
@@ -40,10 +43,18 @@ days = calendar.monthrange(start.year, start.month)[1]
 dates = [start + timedelta(days=x) for x in range(0, days)]
 
 session = requests.Session()
+session.mount("http://", requests.adapters.HTTPAdapter(max_retries=1))
 session.mount("https://", requests.adapters.HTTPAdapter(max_retries=1))
+timeout = 20
 for d in dates:
     for hour in range(0, 24):
         url = get_order_book_url(d, hour)
-        books = session.get(url).json(object_pairs_hook=OrderedDict)
-        for book in books:
-            print_(json.dumps(book))
+        while True:
+            try:
+                books = session.get(url, timeout=timeout).json(object_pairs_hook=OrderedDict)
+                for book in books:
+                    print_(json.dumps(book))
+                break
+            except (socket.error, ConnectionError) as e:
+                sleep(5)
+                continue
